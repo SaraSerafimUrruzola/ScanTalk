@@ -12,3 +12,5 @@ Este protótipo tem como objetivo devolver a autonomia de pessoas com dificuldad
 - Atualmente, o projeto é apenas um protótipo, onde parte das funções são simuladas para fins de demonstração
 - Mudança funcional de idiomas não implementada
 - TTS (Text-to-Speech) integrado não implementado
+
+Projeto feito por Sara Serafim Urruzola
