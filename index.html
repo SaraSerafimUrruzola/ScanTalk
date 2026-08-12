@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ScanTalk Protótipo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    :root {
+      --brand-yellow: #FFE600;  
+      --brand-active: #C2AB00;  
+      --icon-dark: #000000;      
+      --icon-light: #FFFFFF;     
+      --font-scale: 1;
+    }
+
+    body {
+      background-color: #121212;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    #app-container {
+      width: 100%;
+      max-width: 412px;
+      height: 100vh;
+      max-height: 869px;
+      background: white;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .dynamic-text {
+      font-size: calc(1rem * var(--font-scale)) !important;
+    }
+    .dynamic-title {
+      font-size: calc(1.5rem * var(--font-scale)) !important;
+    }
+
+    .nav-btn {
+      background-color: var(--brand-yellow);
+      color: var(--icon-dark);
+      transition: all 0.15s ease-in-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .nav-btn.active {
+      background-color: var(--brand-active);
+      color: var(--icon-dark);
+    }
+
+    .nav-btn:active,
+    .nav-btn.active:active {
+      background-color: var(--brand-active);
+      color: var(--icon-light);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+
+    <div id="audio-toast" class="hidden absolute top-10 left-4 right-4 bg-gray-900 text-white p-3 rounded-xl shadow-2xl z-50 flex items-center space-x-3 border-2 border-[#FFE600]">
+      <span class="text-2xl animate-bounce">📣</span>
+      <div class="flex-1 text-xs">
+        <p class="font-bold text-[#FFE600]">Reproduzindo Áudio...</p>
+        <p id="audio-toast-text" class="text-gray-200">Lendo informações em voz alta.</p>
+      </div>
+      <button onclick="stopAudioSim()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="h-6 bg-[#FFE600] flex justify-end items-center px-3 text-xs font-semibold text-black shrink-0">
+      <i class="fa-solid fa-battery-full text-sm"></i>
+    </div>
+
+    <div class="flex-1 relative overflow-y-auto">
+
+      <div id="screen-splash" class="absolute inset-0 bg-[#FFE600] flex flex-col justify-center items-center z-50 transition-opacity duration-500 p-6">
+        <img 
+          src="logo.png" 
+          alt="ScanTalk Logo" 
+          class="max-w-[280px] w-full h-auto object-contain"
+          onerror="this.onerror=null; this.classList.add('hidden'); document.getElementById('splash-svg-fallback').classList.remove('hidden');"
+        />
+
+        <div id="splash-svg-fallback" class="hidden flex items-center justify-center">
+          <svg width="280" height="90" viewBox="0 0 280 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <text x="5" y="65" font-family="Arial, sans-serif" font-weight="900" font-style="italic" font-size="48" fill="black">ScanTalk</text>
+            <path d="M235 20 L245 5 M250 32 L268 22 M255 45 L272 45" stroke="black" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <div id="screen-search" class="screen flex flex-col h-full p-4 hidden">
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button id="btn-codigo" onclick="setSearchType('codigo')" class="py-2.5 rounded-lg text-lg font-medium bg-[#FFE600] text-black shadow-sm transition dynamic-text">
+            Código
+          </button>
+          <button id="btn-marca" onclick="setSearchType('marca')" class="py-2.5 rounded-lg text-lg font-medium bg-gray-300 text-gray-700 transition dynamic-text">
+            Marca
+          </button>
+        </div>
+
+        <form onsubmit="executeSearch(event)" class="relative flex items-center border-b border-gray-300 pb-2 mb-4">
+          <i class="fa-solid fa-magnifying-glass text-gray-400 text-xl mr-3"></i>
+          <input 
+            id="search-input"
+            type="text" 
+            placeholder="Digite o código de barras..." 
+            class="w-full text-lg text-gray-700 placeholder-gray-400 outline-none bg-transparent dynamic-text"
+          />
+          <button type="submit" class="bg-[#FFE600] text-black px-3 py-1 rounded-md text-sm font-bold active:scale-95 transition">Buscar</button>
+        </form>
+
+        <div id="empty-state" class="flex-1 flex flex-col justify-center items-center text-center p-6 text-gray-400">
+          <i class="fa-solid fa-barcode text-6xl mb-4 text-gray-300"></i>
+          <p class="text-base font-medium dynamic-text">Nenhum produto consultado.</p>
+          <p class="text-xs text-gray-400 mt-1">Digite um código acima ou vá até aba escanear para ver os detalhes do produto.</p>
+        </div>
+
+        <div id="brands-popup" class="hidden flex-1 overflow-y-auto bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <div class="mb-3 bg-yellow-100 border-l-4 border-[#FFE600] p-2 text-xs text-yellow-900 rounded">
+            <strong>Marcas Colaboradoras:</strong> Estas marcas possuem catálogo completo sincronizado com leitor de voz.
+          </div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Marcas Parceiras</p>
+          <ul class="space-y-2">
+            <li onclick="filterByBrand('Pringles')" class="p-3 bg-white rounded-lg shadow-sm hover:bg-yellow-100 cursor-pointer text-gray-800 font-medium dynamic-text flex justify-between items-center">
+              <div>
+                <span>Pringles</span>
+                <span class="block text-xs text-gray-400 font-normal">Batatas em lata (Vários sabores)</span>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs text-gray-400"></i>
+            </li>
+            <li onclick="filterByBrand('Nestlé')" class="p-3 bg-white rounded-lg shadow-sm hover:bg-yellow-100 cursor-pointer text-gray-800 font-medium dynamic-text flex justify-between items-center">
+              <div>
+                <span>Nestlé</span>
+                <span class="block text-xs text-gray-400 font-normal">Achocolatados e Biscoitos</span>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs text-gray-400"></i>
+            </li>
+            <li onclick="filterByBrand('Coca-Cola')" class="p-3 bg-white rounded-lg shadow-sm hover:bg-yellow-100 cursor-pointer text-gray-800 font-medium dynamic-text flex justify-between items-center">
+              <div>
+                <span>Coca-Cola</span>
+                <span class="block text-xs text-gray-400 font-normal">Refrigerantes e Sucos</span>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs text-gray-400"></i>
+            </li>
+          </ul>
+        </div>
+
+        <div id="product-result" class="hidden flex-1 overflow-y-auto bg-white rounded-lg p-4 border border-gray-200 shadow-sm relative">
+          <button onclick="playAudioSimulation()" class="absolute top-3 right-3 bg-[#FFE600] text-black w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-md active:scale-90 transition" title="Ouvir informações">
+            📣
+          </button>
+
+          <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded uppercase font-semibold">Produto Encontrado</span>
+          
+          <h3 id="prod-title" class="text-xl font-bold text-gray-900 mt-2 dynamic-text">--</h3>
+          <p id="prod-brand" class="text-sm font-medium text-yellow-600 mb-3 dynamic-text">--</p>
+
+          <div class="space-y-3 text-sm text-gray-700">
+            <div class="border-t pt-2">
+              <span class="font-bold block text-gray-900">Ingredientes:</span>
+              <p id="prod-ingredients" class="text-xs text-gray-600 leading-relaxed">--</p>
+            </div>
+
+            <div class="border-t pt-2">
+              <span class="font-bold block text-gray-900 mb-1">Tabela Nutricional:</span>
+              <ul id="prod-nutrition" class="text-xs space-y-1 bg-gray-50 p-2 rounded border">
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="screen-scan" class="screen flex flex-col h-full bg-[#333333] text-white p-6 justify-between items-center text-center hidden">
+        <p class="text-xl font-medium mt-4 max-w-xs leading-snug dynamic-text">
+          Aproxime a câmera do código de barras para escanear.
+        </p>
+
+        <div id="camera-box" class="w-full max-w-xs h-56 border-4 border-white rounded-2xl bg-gray-500/50 shadow-inner flex flex-col items-center justify-center relative overflow-hidden">
+          <span id="camera-text" class="text-gray-300 text-sm dynamic-text">Simulação de Câmera</span>
+          <div id="scan-line" class="hidden absolute w-full h-1 bg-red-500 top-0 animate-pulse"></div>
+        </div>
+
+        <button onclick="simScanSuccess()" class="bg-[#FFE600] text-black font-bold text-lg py-3 px-10 rounded-full shadow-lg border-2 border-white mb-6 active:scale-95 transition dynamic-text">
+          ESCANEAR
+        </button>
+      </div>
+
+      <div id="screen-settings" class="screen flex flex-col h-full p-4 hidden">
+        <h2 class="text-2xl font-normal text-gray-800 pb-3 mb-2 border-b border-gray-200 dynamic-title">
+          Configurações
+        </h2>
+
+        <div onclick="openLanguageModal()" class="flex justify-between items-center py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 px-2 rounded transition">
+          <span class="text-lg text-gray-800 dynamic-text">Idioma:</span>
+          <span id="current-language" class="text-lg text-gray-700 font-light truncate max-w-[180px] dynamic-text">Padrão do dispositivo</span>
+        </div>
+
+        <div onclick="openVoiceModal()" class="flex justify-between items-center py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 px-2 rounded transition">
+          <span class="text-lg text-gray-800 dynamic-text">Voz selecionada:</span>
+          <span id="current-voice" class="text-lg text-gray-700 font-light dynamic-text">Felipe (PT-BR)</span>
+        </div>
+
+        <div class="py-4 border-b border-gray-100">
+          <span class="text-lg text-gray-800 block mb-4 dynamic-text">Tamanho da fonte:</span>
+          <div class="flex items-center space-x-3 px-2">
+            <span class="text-sm font-semibold text-gray-800">A</span>
+            <input 
+              id="font-slider"
+              type="range" 
+              min="1" 
+              max="9" 
+              value="5" 
+              oninput="updateFontSize(this.value)"
+              class="w-full accent-yellow-400 cursor-pointer h-2 bg-gray-300 rounded-lg appearance-none"
+            />
+            <span class="text-2xl font-bold text-gray-800">A</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="modal-language" class="hidden absolute inset-0 bg-black/50 z-50 flex items-end justify-center">
+      <div class="bg-white w-full rounded-t-2xl p-5 shadow-2xl">
+        <div class="flex justify-between items-center mb-4 pb-2 border-b">
+          <h3 class="text-xl font-bold text-gray-800">Selecione o Idioma</h3>
+          <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <ul class="space-y-2">
+          <li onclick="selectLanguage('Padrão do dispositivo')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800">Padrão do dispositivo</li>
+          <li onclick="selectLanguage('Português')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800">Português</li>
+          <li onclick="selectLanguage('Espanhol')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800">Espanhol</li>
+          <li onclick="selectLanguage('Inglês')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800">Inglês</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="modal-voice" class="hidden absolute inset-0 bg-black/50 z-50 flex items-end justify-center">
+      <div class="bg-white w-full rounded-t-2xl p-5 shadow-2xl max-h-[80%] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4 pb-2 border-b">
+          <h3 class="text-xl font-bold text-gray-800">Vozes Disponíveis (Loquendo)</h3>
+          <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <ul class="space-y-2">
+          <li onclick="selectVoice('Felipe (PT-BR)')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800 flex justify-between">
+            <span>Felipe</span> <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">PT-BR Masculina</span>
+          </li>
+          <li onclick="selectVoice('Fernanda (PT-BR)')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800 flex justify-between">
+            <span>Fernanda</span> <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">PT-BR Feminina</span>
+          </li>
+          <li onclick="selectVoice('Jorge (ES)')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800 flex justify-between">
+            <span>Jorge</span> <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">ES Masculina</span>
+          </li>
+          <li onclick="selectVoice('Dave (EN-US)')" class="p-3 rounded-lg hover:bg-yellow-100 cursor-pointer font-medium text-gray-800 flex justify-between">
+            <span>Dave</span> <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">EN-US Masculina</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="bottom-nav" class="h-16 grid grid-cols-3 shrink-0">
+      <button onclick="switchTab('search')" id="nav-search" class="nav-btn">
+        <i class="fa-solid fa-magnifying-glass text-3xl"></i>
+      </button>
+
+      <button onclick="switchTab('scan')" id="nav-scan" class="nav-btn">
+        <i class="fa-solid fa-barcode text-3xl"></i>
+      </button>
+
+      <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn">
+        <i class="fa-solid fa-ellipsis text-3xl"></i>
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    const productDatabase = {
+      pringles: {
+        title: "Pringles Original (114g)",
+        brand: "Kellogg's / Pringles",
+        ingredients: "Batatas desidratadas, óleos vegetais (girassol, milho), farinha de arroz, amido de trigo, farinha de milho, emulsificante e sal.",
+        nutrition: [
+          { label: "Valor Energético", val: "131 kcal" },
+          { label: "Carboidratos", val: "13g" },
+          { label: "Proteínas", val: "1.1g" },
+          { label: "Gorduras Totais", val: "8.3g" },
+          { label: "Sódio", val: "130mg" }
+        ]
+      },
+      nestle: {
+        title: "Nescau Cereal Matinal (210g)",
+        brand: "Nestlé",
+        ingredients: "Farinha de milho enriquecida, açúcar, cacau em pó, óleo vegetal, sal, minerais, vitaminas e aromatizantes.",
+        nutrition: [
+          { label: "Valor Energético", val: "118 kcal" },
+          { label: "Carboidratos", val: "22g" },
+          { label: "Proteínas", val: "1.8g" },
+          { label: "Sódio", val: "95mg" }
+        ]
+      },
+      cocacola: {
+        title: "Coca-Cola Sabor Original (350ml)",
+        brand: "Coca-Cola Brasil",
+        ingredients: "Água gasosa, açúcar, noz de cola, cafeína, corante caramelo IV, acidulante ácido fosfórico e aroma natural.",
+        nutrition: [
+          { label: "Valor Energético", val: "149 kcal" },
+          { label: "Carboidratos", val: "37g" },
+          { label: "Sódio", val: "18mg" }
+        ]
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('screen-splash');
+        splash.classList.add('opacity-0');
+        setTimeout(() => {
+          splash.classList.add('hidden');
+          switchTab('search');
+        }, 500);
+      }, 1500);
+    });
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+      if (tabName === 'search') {
+        document.getElementById('screen-search').classList.remove('hidden');
+        document.getElementById('nav-search').classList.add('active');
+      } else if (tabName === 'scan') {
+        document.getElementById('screen-scan').classList.remove('hidden');
+        document.getElementById('nav-scan').classList.add('active');
+      } else if (tabName === 'settings') {
+        document.getElementById('screen-settings').classList.remove('hidden');
+        document.getElementById('nav-settings').classList.add('active');
+      }
+    }
+
+    function setSearchType(type) {
+      const btnCodigo = document.getElementById('btn-codigo');
+      const btnMarca = document.getElementById('btn-marca');
+      const input = document.getElementById('search-input');
+      const brandsPopup = document.getElementById('brands-popup');
+      const emptyState = document.getElementById('empty-state');
+      const productResult = document.getElementById('product-result');
+
+      if (type === 'codigo') {
+        btnCodigo.className = 'py-2.5 rounded-lg text-lg font-medium bg-[#FFE600] text-black shadow-sm transition dynamic-text';
+        btnMarca.className = 'py-2.5 rounded-lg text-lg font-medium bg-gray-300 text-gray-700 transition dynamic-text';
+        input.placeholder = 'Digite o código de barras...';
+        brandsPopup.classList.add('hidden');
+        
+        if (productResult.dataset.hasData === 'true') {
+          productResult.classList.remove('hidden');
+          emptyState.classList.add('hidden');
+        } else {
+          emptyState.classList.remove('hidden');
+          productResult.classList.add('hidden');
+        }
+      } else {
+        btnMarca.className = 'py-2.5 rounded-lg text-lg font-medium bg-[#FFE600] text-black shadow-sm transition dynamic-text';
+        btnCodigo.className = 'py-2.5 rounded-lg text-lg font-medium bg-gray-300 text-gray-700 transition dynamic-text';
+        input.placeholder = 'Pesquisar marcas parceiras...';
+        brandsPopup.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+        productResult.classList.add('hidden');
+      }
+    }
+
+    function executeSearch(e) {
+      if (e) e.preventDefault();
+      const val = document.getElementById('search-input').value.toLowerCase().trim();
+      
+      let key = 'pringles';
+      if (val.includes('nestle') || val.includes('nescau')) key = 'nestle';
+      if (val.includes('coca')) key = 'cocacola';
+
+      displayProduct(key);
+    }
+
+    function filterByBrand(brand) {
+      let key = 'pringles';
+      if (brand === 'Nestlé') key = 'nestle';
+      if (brand === 'Coca-Cola') key = 'cocacola';
+
+      document.getElementById('search-input').value = brand;
+      setSearchType('codigo');
+      displayProduct(key);
+    }
+
+    function displayProduct(productKey) {
+      const data = productDatabase[productKey] || productDatabase['pringles'];
+
+      document.getElementById('prod-title').innerText = data.title;
+      document.getElementById('prod-brand').innerText = "Marca: " + data.brand;
+      document.getElementById('prod-ingredients').innerText = data.ingredients;
+
+      const nutritionContainer = document.getElementById('prod-nutrition');
+      nutritionContainer.innerHTML = '';
+      data.nutrition.forEach(item => {
+        nutritionContainer.innerHTML += `
+          <li class="flex justify-between">
+            <span>${item.label}:</span> <strong>${item.val}</strong>
+          </li>
+        `;
+      });
+
+      const productResult = document.getElementById('product-result');
+      productResult.dataset.hasData = 'true';
+      productResult.classList.remove('hidden');
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('brands-popup').classList.add('hidden');
+
+      playAudioSimulation();
+    }
+
+    function simScanSuccess() {
+      const cameraText = document.getElementById('camera-text');
+      const scanLine = document.getElementById('scan-line');
+
+      cameraText.innerText = "Lendo código de barras...";
+      scanLine.classList.remove('hidden');
+
+      setTimeout(() => {
+        scanLine.classList.add('hidden');
+        cameraText.innerText = "Simulação de Câmera";
+        switchTab('search');
+        setSearchType('codigo');
+        displayProduct('pringles');
+      }, 1200);
+    }
+
+    function playAudioSimulation() {
+      const title = document.getElementById('prod-title').innerText;
+      const voice = document.getElementById('current-voice').innerText;
+      const toast = document.getElementById('audio-toast');
+      const toastText = document.getElementById('audio-toast-text');
+
+      toastText.innerText = `[Voz: ${voice}]: "${title}. Lendo lista de ingredientes e tabela nutricional..."`;
+      toast.classList.remove('hidden');
+
+      setTimeout(() => {
+        stopAudioSim();
+      }, 4000);
+    }
+
+    function stopAudioSim() {
+      document.getElementById('audio-toast').classList.add('hidden');
+    }
+
+    function openLanguageModal() { document.getElementById('modal-language').classList.remove('hidden'); }
+    function openVoiceModal() { document.getElementById('modal-voice').classList.remove('hidden'); }
+    function closeModals() {
+      document.getElementById('modal-language').classList.add('hidden');
+      document.getElementById('modal-voice').classList.add('hidden');
+    }
+
+    function selectLanguage(lang) {
+      document.getElementById('current-language').innerText = lang;
+      closeModals();
+    }
+
+    function selectVoice(voice) {
+      document.getElementById('current-voice').innerText = voice;
+      closeModals();
+    }
+
+    function updateFontSize(val) {
+      const scale = 0.85 + (val - 1) * 0.0625;
+      document.documentElement.style.setProperty('--font-scale', scale);
+    }
+  </script>
+</body>
+</html>
